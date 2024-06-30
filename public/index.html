@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log Analyzer</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.1/styles/default.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.1/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+  <style>
+    pre {
+      background-color: #f8f9fa;
+      padding: 10px;
+      border: 1px solid #ced4da;
+      overflow-x: auto; /* Đảm bảo các đoạn JSON dài không bị tràn khỏi khung */
+    }
+    #buttonLabel {
+      margin: 10px;
+      font-size: 20px;
+      color: #6c757d; /* Màu chữ tùy chọn */
+    }
+    pre .string { color: green; }
+    pre .number { color: darkorange; }
+    pre .boolean { color: blue; }
+    pre .null { color: magenta; }
+    pre .key { color: red; }
+    .highlight { background-color: yellow; }
+
+  </style>
+</head>
+<body>
+  <div class="container mt-2">
+    <h1>Analyzer Log File</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="logFile">Choose a log file:</label>
+        <input type="file" class="form-control-file" id="logFile" name="logFile" required>
+      </div>
+      <!-- <button type="submit" class="btn btn-primary">Upload</button> -->
+    </form>
+
+    <div class="mt-4">
+      <button class="btn btn-secondary mr-2" id="allBtn">ALL</button>
+      <button class="btn btn-danger mr-2" id="errorBtn">ERROR</button>
+      <button class="btn btn-info mr-2" id="sentJsonBtn">SENT JSON</button>
+      <button class="btn btn-warning mr-2" id="receivedJsonBtn">RECEIVED JSON</button>
+      <button class="btn btn-success mr-2" id="resumeJsonBtn">RESUME JSON</button>
+      <button class="btn btn-primary" id="transactionJsonBtn">TRANS JSON</button>
+      <button class="btn btn-dark ml-2" id="jsonBtn">JSON</button>
+      <button class="btn btn-warning" id="longMsgSentBtn">LONG_MSG_SENT</button>
+    </div>
+
+    <div class="mt-2" id="buttonLabel"></div>
+
+    <!-- <div class="mt-4">
+      <span class="btn btn-outline-primary" id="callbackResponse">CallBackResponse</span>
+      <span class="btn btn-outline-primary" id="directResponse">DirectResponse</span>
+    </div> -->
+
+
+    <pre class="mt-10"  id="results"></pre>
+  </div>
+
+  <!-- Bootstrap JS and Fetch API -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      fetch('/upload', {
+        method: 'POST',
+        body: formData,
+      })
+        .then(response => response.json())
+        .then(data => {
+          displayLogs(data);
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    function clearResult(){
+      const resultsElem = document.getElementById('results');
+      resultsElem.innerHTML = ''; // Clear previous results
+
+    }
+    function displayLogs(logs) {
+      const resultsElem = document.getElementById('results');
+      resultsElem.innerHTML = ''; // Clear previous results
+
+      logs.forEach(log => {
+        const logStr = JSON.stringify(log, null, 2);
+        const logElem = document.createElement('pre');
+        logElem.textContent = logStr;
+        resultsElem.appendChild(logElem);
+
+        // Highlight JSON content
+        hljs.highlightBlock(logElem);
+      });
+    }
+
+
+document.getElementById('allBtn').addEventListener('click', function () {
+  clearResult();
+  updateButtonLabel('Showing ALL logs');
+  uploadAndFilterLogs('ALL');
+});
+
+document.getElementById('errorBtn').addEventListener('click', function () {
+  clearResult();
+  updateButtonLabel('Showing ERROR logs');
+  uploadAndFilterLogs('ERROR');
+});
+
+document.getElementById('sentJsonBtn').addEventListener('click', function () {
+  clearResult();
+  updateButtonLabel('Showing logs with SENT JSON');
+  uploadAndFilterLogs('SENT_JSON');
+});
+
+document.getElementById('receivedJsonBtn').addEventListener('click', function () {
+  clearResult();
+  updateButtonLabel('Showing logs with RECEIVED JSON');
+  uploadAndFilterLogs('RECEIVED_JSON');
+});
+
+document.getElementById('resumeJsonBtn').addEventListener('click', function () {
+  clearResult();
+  updateButtonLabel('Showing logs with RESUME JSON');
+  uploadAndFilterLogs('RESUME_JSON');
+});
+
+document.getElementById('transactionJsonBtn').addEventListener('click', function () {
+  clearResult();
+  updateButtonLabel('Showing logs with TRANSACTION JSON');
+  uploadAndFilterLogs('TRANS_JSON');
+});
+
+document.getElementById('jsonBtn').addEventListener('click', function () {
+  clearResult();
+  updateButtonLabel('Showing logs with any JSON');
+  uploadAndFilterLogs('JSON');
+});
+
+document.getElementById('longMsgSentBtn').addEventListener('click', function () {
+  clearResult();
+  updateButtonLabel('Showing long messages from SENT JSON');
+  uploadAndFilterLogs('LONG_MSG_SENT');
+});
+
+// Function to update button label
+function updateButtonLabel(text) {
+  document.getElementById('buttonLabel').textContent = text;
+}
+
+
+// Function to upload log file and filter logs based on type
+function uploadAndFilterLogs(filterType) {
+  const formData = new FormData();
+  const fileInput = document.querySelector('input[type="file"]');
+  formData.append('logFile', fileInput.files[0]);
+
+  fetch('/upload', {
+    method: 'POST',
+    body: formData,
+  })
+    .then(response => response.json())
+    .then(data => {
+      
+      // Filter logs based on type
+      let filteredLogs;
+      if (filterType === 'LONG_MSG_SENT') {
+        filteredLogs = extractLongMessages(data);
+      } else {
+        filteredLogs = filterLogs(data, filterType);
+      }
+      displayLogs(filteredLogs);
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      updateButtonLabel("Please upload log file");
+    });
+}
+
+// Function to filter logs based on type
+function filterLogs(logs, filterType) {
+  switch (filterType) {
+    case 'ALL':
+      return logs;
+    case 'ERROR':
+      return logs.filter(log => log.LogType === 'ERROR');
+    case 'SENT_JSON':
+      return logs.filter(log => log.SentJson !== undefined && log.SentJson !== null);
+    case 'RECEIVED_JSON':
+      return logs.filter(log => log.ReceivedJson !== undefined && log.ReceivedJson !== null);
+    case 'RESUME_JSON':
+      return logs.filter(log => log.ResumeInfoJson !== undefined && log.ResumeInfoJson !== null);
+    case 'TRANS_JSON':
+      return logs.filter(log => log.TransactionInfoJson !== undefined && log.TransactionInfoJson !== null);
+    case 'JSON':
+      return logs.filter(log => log.SentJson !== undefined && log.SentJson !== null ||
+                                 log.ReceivedJson !== undefined && log.ReceivedJson !== null ||
+                                 log.ResumeInfoJson !== undefined && log.ResumeInfoJson !== null ||
+                                 log.TransactionInfoJson !== undefined && log.TransactionInfoJson !== null);
+    default:
+      return logs;
+  }
+}
+
+// Function to extract and merge long messages
+function extractLongMessages(logs) {
+  const longMessages = [];
+  let currentLongMessage = null;
+
+  logs.forEach(log => {
+    if (log.SentJson) {
+      if (log.SentJson.messageType === 'StartLongMessage') {
+        currentLongMessage = { ...log.SentJson, messageContent: '' };
+      } else if (log.SentJson.messageType === 'LongMessage' && currentLongMessage) {
+        currentLongMessage.messageContent += log.SentJson.messageContent;
+      } else if (log.SentJson.messageType === 'EndLongMessage' && currentLongMessage) {
+        // currentLongMessage.messageContent += log.SentJson.messageContent;
+        try {
+          currentLongMessage.messageContent = JSON.parse(currentLongMessage.messageContent);
+        } catch (e) {
+          console.error('Error parsing messageContent to JSON:', e);
+        }
+        longMessages.push({"messageType":currentLongMessage.messageContent.messageType,"requestId":currentLongMessage.messageContent.requestId,"messageContent":JSON.parse(currentLongMessage.messageContent.messageContent)});
+        currentLongMessage = null;
+      }
+    }
+  });
+
+  return longMessages;
+}
+
+
+ // Function to highlight search term
+ function highlightSearchTerm(term) {
+      const resultsElem = document.getElementById('results');
+      const innerHTML = resultsElem.innerHTML;
+      const regex = new RegExp(`(${term})`, 'gi');
+      resultsElem.innerHTML = innerHTML.replace(regex, '<span class="highlight">$1</span>');
+    }
+
+    // // Event listeners for search terms
+    // document.getElementById('callbackResponse').addEventListener('click', function () {
+    //   highlightSearchTerm('CallBackResponse');
+    // });
+
+    // document.getElementById('directResponse').addEventListener('click', function () {
+    //   highlightSearchTerm('DirectResponse');
+    // });
+
+  </script>
+</body>
+</html>
